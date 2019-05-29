@@ -1,3 +1,9 @@
 [submodule "deps/glm"]
 	path = deps/glm
 	url = https://github.com/g-truc/glm
+[submodule "test/deps/glfw"]
+	path = test/deps/glfw
+	url = https://github.com/glfw/glfw
+[submodule "test/deps/imgui"]
+	path = test/deps/imgui
+	url = https://github.com/ocornut/imgui
