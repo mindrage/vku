@@ -17,6 +17,8 @@ build
 !.vscode/launch.json
 !.vscode/extensions.json
 
+.vs
+
 # Prerequisites
 *.d
 
