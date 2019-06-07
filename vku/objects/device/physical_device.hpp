@@ -5,6 +5,19 @@
 namespace vku
 {
 
+    class logical_device
+    {
+    public:
+        VkDevice device;
+
+        ~logical_device() {
+            if (device != nullptr) vkDestroyDevice(device, nullptr);
+        }
+
+        // TODO: remove move/copy operator
+    };
+
+
     class physical_device
     {
     public:

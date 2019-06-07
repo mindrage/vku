@@ -1,6 +1,8 @@
 #pragma once
 
 #include "instance.inl"
+#include "../device/default_selector.hpp"
+#include "../device/logical_device.hpp"
 
 vku::instance::instance() :
     layers(),
@@ -65,8 +67,42 @@ vku::instance::setup()
         usable = usable && conf->setup_instance(*this, instance_handle);
     }
 
-    return usable;
+    if (!usable)
+    {
+        return false;
+    }
+
+    read_devices();
+
+    return true;
 }
+
+bool
+vku::instance::read_devices()
+{
+
+    // Fetch all physical devices
+    uint32_t physical_device_count = 0;
+    vkEnumeratePhysicalDevices(instance_handle, &physical_device_count, nullptr);
+    std::vector<VkPhysicalDevice> p_devices(physical_device_count);
+    vkEnumeratePhysicalDevices(instance_handle, &physical_device_count, p_devices.data());
+
+    // Loop through and place them interleaved with thier properties and features.
+    for (int i = 0; i < p_devices.size(); i++)
+    {
+        auto& phys_device = physical_devices.emplace_back();
+        phys_device.device = p_devices[i];
+        vkGetPhysicalDeviceFeatures(phys_device.device, &phys_device.features);
+        vkGetPhysicalDeviceProperties(phys_device.device, &phys_device.properties);
+        uint32_t queue_family_count = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(phys_device.device, &queue_family_count, nullptr);
+        phys_device.queue_families.resize(queue_family_count);
+        vkGetPhysicalDeviceQueueFamilyProperties(phys_device.device, &queue_family_count, phys_device.queue_families.data());
+    }
+
+    return true;
+}
+
 
 void
 vku::instance::destroy()
@@ -171,3 +207,51 @@ vku::instance::extension_supported(const char* ext)
     return false;
 }
 
+
+std::unique_ptr<vku::logical_device>
+vku::instance::create_device(device_selector* const selector)
+{
+    physical_device* phys_device = nullptr;
+    if (selector == nullptr)
+        phys_device = default_device_selector().select(physical_devices);
+    else {
+        phys_device = selector->select(physical_devices);
+    }
+
+    if (phys_device == nullptr)
+    {
+        // TODO: Add error message.
+        return nullptr;
+    }
+
+    // TODO: Future design for multiple queues?
+    VkDeviceQueueCreateInfo queue_create_info = {};
+
+    float queue_priority = 1.0f;
+    queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_create_info.queueFamilyIndex = phys_device->queue_index;
+    queue_create_info.queueCount = 1;
+    queue_create_info.pQueuePriorities = &queue_priority;
+
+    VkPhysicalDeviceFeatures device_features = {};
+
+    VkDeviceCreateInfo device_create_info = {};
+    device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device_create_info.pQueueCreateInfos = &queue_create_info;
+    device_create_info.queueCreateInfoCount = 1;
+    device_create_info.pEnabledFeatures = &device_features;
+    device_create_info.enabledExtensionCount = 0;
+    device_create_info.enabledLayerCount = (uint32_t)layers.size();
+    device_create_info.ppEnabledLayerNames = layers.data();
+
+    std::unique_ptr<logical_device> log_device = std::make_unique<logical_device>();
+
+    if (vkCreateDevice(phys_device->device, &device_create_info, get_allocator_callbacks(), &log_device->device) != VK_SUCCESS) {
+        return nullptr;
+    }
+
+    vkGetDeviceQueue(log_device->device, phys_device->queue_index, 0, &log_device->queue);
+
+    return std::move(log_device);
+
+}

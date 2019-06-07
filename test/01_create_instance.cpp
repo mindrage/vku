@@ -26,10 +26,11 @@ int main(int argc, char** argv)
     vk.configure<vku::glfw_config>();
     vk.configure<vku::app_config>();
     vk.configure<vku::debug_config>();
-    
+
+	
     if (vk.setup())
     {
-
+        auto device = vk.create_device();
         // Update window
         while (!glfwWindowShouldClose(window))
         {
